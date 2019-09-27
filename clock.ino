@@ -38,11 +38,11 @@ RTC_DS3231 rtc;
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 CRGB::HTMLColorCode digits[8][8];
-
+uint8_t intensities[3];
 int radix;
 
 void random_radix() {
-  radix = random(3,8);
+  radix = random(0,8);
 }
 
 //CRGB::HTMLColorCode orange = CRGB::OrangeRed; // this one is good for the pre-soldered panels
@@ -50,6 +50,25 @@ CRGB::HTMLColorCode orange = CRGB::DarkOrange; // this one is good for the indiv
 void setup() {
   Serial.begin(9600);
   randomSeed(analogRead(0));
+  intensities[0] = 7;
+  intensities[1] = 32;
+  intensities[2] = 100;
+
+  // brightness color 1
+  digits[0][0] = CRGB::Red;
+  digits[0][1] = CRGB::Red;
+  digits[0][2] = CRGB::Red;
+
+  // brightness encoding color 2
+  digits[1][0] = CRGB::Green;
+  digits[1][1] = CRGB::Green;
+  digits[1][2] = CRGB::Green;
+
+  // brightness encoding color 3
+  digits[2][0] = CRGB::Blue;
+  digits[2][1] = CRGB::Blue;
+  digits[2][2] = CRGB::Blue;
+
   // base 3
   digits[3][0] = CRGB::Red;
   digits[3][1] = CRGB::Green;
@@ -106,18 +125,37 @@ void setup() {
   random_radix();
 }
 
+void intensity_encode(int led, int value, int radix) {
+  FastLED.setBrightness(110);
+  leds[led] = digits[radix][value];
+  leds[led].fadeLightBy(255-intensities[value]);
+}
 void set_row_forward(int start, int time, int radix) {
-  leds[start+3] = digits[radix][(time)%radix];
-  leds[start+2] = digits[radix][(time/radix)%radix];
-  leds[start+1] = digits[radix][(time/(radix*radix))%radix];
-  leds[start+0] = digits[radix][(time/(radix*radix*radix))%radix];
+  if ( radix < 3) {
+    intensity_encode(start+3, (time)%3, radix);
+    intensity_encode(start+2, (time/3)%3, radix);
+    intensity_encode(start+1, (time/(3*3))%3, radix);
+    intensity_encode(start+0, (time/(3*3*3))%3, radix);
+  } else {
+    leds[start+3] = digits[radix][(time)%radix];
+    leds[start+2] = digits[radix][(time/radix)%radix];
+    leds[start+1] = digits[radix][(time/(radix*radix))%radix];
+    leds[start+0] = digits[radix][(time/(radix*radix*radix))%radix];
+  }
 }
 
 void set_row_backward(int start, int time, int radix) {
-  leds[start+0] = digits[radix][(time)%radix];
-  leds[start+1] = digits[radix][(time/radix)%radix];
-  leds[start+2] = digits[radix][(time/(radix*radix))%radix];
-  leds[start+3] = digits[radix][(time/(radix*radix*radix))%radix];
+  if ( radix < 3) {
+    intensity_encode(start+0, (time)%3, radix);
+    intensity_encode(start+1, (time/3)%3, radix);
+    intensity_encode(start+2, (time/(3*3))%3, radix);
+    intensity_encode(start+3, (time/(3*3*3))%3, radix);
+  } else {
+    leds[start+0] = digits[radix][(time)%radix];
+    leds[start+1] = digits[radix][(time/radix)%radix];
+    leds[start+2] = digits[radix][(time/(radix*radix))%radix];
+    leds[start+3] = digits[radix][(time/(radix*radix*radix))%radix];
+  }
 }
 
 void loop()
@@ -136,11 +174,14 @@ void loop()
   if ((now.dayOfTheWeek() == 5) &&
       (now.hour() == 15) &&
       ((now.minute() == 58) || (now.minute() == 59))) {
+    radix = 3;
     if ((now.second() % 2) == 0) {
       FastLED.setBrightness( 110 );
     } else {
       FastLED.setBrightness(  BRIGHTNESS );
     }
+  } else {
+    FastLED.setBrightness(  BRIGHTNESS );
   }
 
   set_row_backward(0, now.second(), radix);
@@ -148,8 +189,8 @@ void loop()
   set_row_backward(8, now.hour(), radix);
   set_row_forward(12, now.day(), radix);
   FastLED.show();
-  delay(100);
 
+  delay(100);
 }
 
 void printTime()
